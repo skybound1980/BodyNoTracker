@@ -1,0 +1,17 @@
+{
+  "name": "Body No 관리",
+  "short_name": "Body No",
+  "description": "Body No 취득 및 진행현황 관리",
+  "start_url": "./bodyno_tracker.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#EEF1F5",
+  "theme_color": "#1F2A3C",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
