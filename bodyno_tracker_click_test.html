@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Body No 관리</title>
+<title>Body No 관리 (클릭테스트)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1F2A3C">
 <link rel="icon" href="icon-192.png">
@@ -541,7 +541,7 @@
 <body>
 <div id="app">
   <header>
-    <div class="title"><span class="dot" id="connDot"></span> BODY NO 관리</div>
+    <div class="title"><span class="dot" id="connDot"></span> BODY NO 관리 (클릭테스트)</div>
     <div class="worker" id="workerBadge">작업자 미설정</div>
   </header>
   <div id="toast"></div>
@@ -1878,34 +1878,38 @@ document.querySelectorAll('nav button').forEach(btn=>{
   btn.addEventListener('click', ()=> goTab(btn.dataset.tab));
 });
 
-let lastKeyActionAt = 0;
-const KEY_DEBOUNCE_MS = 100;
+const KEYPAD_CLICK_ACTIONS = ['digit','backspace','clear-digits','issue-digit','issue-backspace','issue-clear'];
+
+// [TEST BUILD] 숫자 키패드류 액션은 click(누르고 뗄 때)으로 동작 — pointerdown 경로에서는 건너뜀
 document.getElementById('main').addEventListener('pointerdown', function(e){
   const btn = e.target.closest('[data-action]');
   if(!btn || btn.disabled) return;
-  e.preventDefault();
   const action = btn.dataset.action;
-  const isDebouncedAction = ['digit','backspace','clear-digits','issue-digit','issue-backspace','issue-clear'].includes(action);
-  if(isDebouncedAction){
-    const now = Date.now();
-    if(now - lastKeyActionAt < KEY_DEBOUNCE_MS) return;
-    lastKeyActionAt = now;
-  }
-  if(action === 'digit') pressDigit(Number(btn.dataset.digit));
-  else if(action === 'backspace') backspace();
-  else if(action === 'clear-digits') clearDigits();
-  else if(action === 'submit') submitBodyNo();
+  if(KEYPAD_CLICK_ACTIONS.includes(action)) return; // click 리스너가 처리
+  e.preventDefault();
+  if(action === 'submit') submitBodyNo();
   else if(action === 'select-code') selectCode(btn.dataset.code);
   else if(action === 'select-device') selectDevice(btn.dataset.device);
   else if(action === 'remove-device') removeDevice(btn.dataset.device);
   else if(action === 'issue-select-code') selectIssueCode(btn.dataset.code);
-  else if(action === 'issue-digit') issuePressDigit(Number(btn.dataset.digit));
-  else if(action === 'issue-backspace') issueBackspace();
-  else if(action === 'issue-clear') issueClearDigits();
   else if(action === 'issue-type') setIssueType(btn.dataset.type);
   else if(action === 'issue-submit') submitIssue();
   else if(action === 'issue-resolve-submit') submitResolution();
 }, { passive:false });
+
+// [TEST BUILD] 숫자 키패드류 전용 click 리스너 (누르고 뗄 때만 반응)
+document.getElementById('main').addEventListener('click', function(e){
+  const btn = e.target.closest('[data-action]');
+  if(!btn || btn.disabled) return;
+  const action = btn.dataset.action;
+  if(!KEYPAD_CLICK_ACTIONS.includes(action)) return;
+  if(action === 'digit') pressDigit(Number(btn.dataset.digit));
+  else if(action === 'backspace') backspace();
+  else if(action === 'clear-digits') clearDigits();
+  else if(action === 'issue-digit') issuePressDigit(Number(btn.dataset.digit));
+  else if(action === 'issue-backspace') issueBackspace();
+  else if(action === 'issue-clear') issueClearDigits();
+});
 
 function render(){
   renderHeader();
