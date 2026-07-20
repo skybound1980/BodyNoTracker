@@ -657,7 +657,6 @@ let pendingFilterSold = '';
 let aggByWorker = false;
 let aggByDevice = false;
 let aggByDate = false;
-let aggByTargetStatus = false;
 let targetSet = new Set();
 function targetBodyNo(t){
   return typeof t === 'string' ? t : (t && t.bodyNo) || '';
@@ -931,13 +930,16 @@ function renderCaptureScan(){
     <div class="card" id="scanCard" style="text-align:center;padding:34px 16px 26px;" onclick="focusScanInput()">
       <div style="font-size:48px;line-height:1;">${submitting ? '⏳' : scanIcon(48)}</div>
       <h3 style="justify-content:center;margin-top:12px;">${submitting ? '저장 중...' : '바코드 스캔 대기 중'}</h3>
-      <div class="help">블루투스로 연결된 스캐너에서 Body No 바코드를 스캔하면 자동으로 저장됩니다.${searchMode ? ' (대상 여부도 함께 표시됩니다)' : ''}</div>
+      <div class="help">${searchMode ? '스캔 시 대상이면 자동 등록되고, 비대상이면 등록 버튼을 눌러야 저장됩니다.' : '블루투스로 연결된 스캐너에서 Body No 바코드를 스캔하면 자동으로 저장됩니다.'}</div>
       <input id="scanInput" type="text" inputmode="none" autocomplete="off" autocapitalize="off" spellcheck="false"
         style="position:absolute;width:1px;height:1px;opacity:0;border:none;padding:0;">
       <div style="margin-top:20px;font-family:'Roboto Mono',monospace;font-weight:700;font-size:24px;letter-spacing:2px;color:var(--primary);">
         ${lastScan ? escapeHtml(lastScan) : '대기 중'}
       </div>
     </div>
+    ${searchMode && digits.length === 6 ? `
+    <button class="btn btn-primary btn-block submit-btn" data-action="submit" ${submitting ? 'disabled' : ''}>${submitting ? '저장 중...' : '등록'}</button>
+    ` : ''}
     ${recent.length ? `
     <div class="card">
       <h3>최근 스캔 기록</h3>
@@ -982,7 +984,18 @@ function handleScanValue(raw){
   digits = parsed.number;
   lastScan = selectedCode + ' ' + digits;
   refreshSearchPreview();
-  submitBodyNo();
+
+  if(searchMode){
+    const bodyNo = selectedCode + ' ' + digits;
+    const match = findTargetMatch(bodyNo);
+    if(match){
+      submitBodyNo(); // 대상 → 자동 등록
+    } else {
+      render(); // 비대상 → 자동 등록하지 않고, 등록 버튼을 눌러야 함
+    }
+  } else {
+    submitBodyNo(); // 대상 검색 비활성 → 항상 자동 등록
+  }
 }
 function selectCode(c){ if(c===selectedCode) return; selectedCode = c; digits=''; refreshSearchPreview(); render(); }
 function selectDevice(d){ if(d===selectedDevice) return; selectedDevice = d; render(); }
@@ -1238,52 +1251,67 @@ function renderStatusList(filtered, hasTarget){
 }
 
 function renderAggBody(){
-  if(!aggByWorker && !aggByDevice && !aggByDate && !aggByTargetStatus){
+  if(!aggByWorker && !aggByDevice && !aggByDate){
     return `<div class="help">기준을 하나 이상 선택하면 집계표가 나타납니다.</div>`;
   }
   const { filtered, hasTarget } = getStatusData();
-  const useTargetDim = aggByTargetStatus && hasTarget;
   const groups = {};
-  filtered.forEach(r=>{
+
+  function keyPartsFor(dateStr, worker, device){
     const parts = [];
-    if(aggByDate) parts.push(new Date(r.ts||r.timestamp).toLocaleDateString('ko-KR'));
-    if(useTargetDim) parts.push(isInTarget(r.bodyNo) ? '대상' : '대상외');
-    if(aggByWorker) parts.push(r.worker || '(미상)');
-    if(aggByDevice) parts.push(r.device || '(미지정)');
+    if(aggByDate) parts.push(dateStr);
+    if(aggByWorker) parts.push(worker || '(미상)');
+    if(aggByDevice) parts.push(device || '(미지정)');
+    return parts;
+  }
+  function getGroup(parts){
     const key = parts.join('|||');
-    if(!groups[key]) groups[key] = { parts, count: 0 };
-    groups[key].count++;
+    if(!groups[key]) groups[key] = { parts, target:0, outTarget:0, issue:0 };
+    return groups[key];
+  }
+
+  filtered.forEach(r=>{
+    const dateStr = new Date(r.ts||r.timestamp).toLocaleDateString('ko-KR');
+    const g = getGroup(keyPartsFor(dateStr, r.worker, r.device));
+    if(hasTarget){
+      if(isInTarget(r.bodyNo)) g.target++; else g.outTarget++;
+    } else {
+      g.target++;
+    }
   });
-  const rows = Object.values(groups).sort((a,b)=> b.count - a.count);
+  state.issues.forEach(i=>{
+    const dateStr = new Date(i.timestamp).toLocaleDateString('ko-KR');
+    const g = getGroup(keyPartsFor(dateStr, i.worker, aggByDevice ? '' : undefined));
+    g.issue++;
+  });
+
+  const rows = Object.values(groups).sort((a,b)=> (b.target+b.outTarget) - (a.target+a.outTarget));
 
   const headers = [];
   if(aggByDate) headers.push('날짜');
-  if(useTargetDim) headers.push('대상여부');
   if(aggByWorker) headers.push('작업자');
   if(aggByDevice) headers.push('장비');
-  headers.push('수량');
+  if(hasTarget){ headers.push('대상'); headers.push('비대상'); } else { headers.push('등록'); }
+  headers.push('이상');
 
   if(!rows.length){
     return `<div class="empty" style="padding:20px 10px;"><p>집계할 데이터가 없습니다.</p></div>`;
   }
 
-  const targetColIdx = useTargetDim ? (aggByDate ? 1 : 0) : -1; // index within r.parts
+  const totalTarget = rows.reduce((s,r)=>s+r.target,0);
+  const totalOutTarget = rows.reduce((s,r)=>s+r.outTarget,0);
+  const totalIssue = rows.reduce((s,r)=>s+r.issue,0);
+  const dimColCount = headers.length - (hasTarget ? 3 : 2);
 
   return `
     <div class="agg-table-wrap">
       <table class="agg-table">
         <thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
         <tbody>
-          ${rows.map(r=>`<tr>${r.parts.map((p,i)=>{
-            if(i === targetColIdx){
-              const cls = p === '대상' ? 'tag-in' : 'tag-out';
-              return `<td><span class="tag ${cls}" style="margin-right:0;">${escapeHtml(p)}</span></td>`;
-            }
-            return `<td>${escapeHtml(p)}</td>`;
-          }).join('')}<td class="agg-count">${r.count}</td></tr>`).join('')}
+          ${rows.map(r=>`<tr>${r.parts.map(p=>`<td>${escapeHtml(p)}</td>`).join('')}${hasTarget ? `<td class="agg-count">${r.target}</td><td class="agg-count">${r.outTarget}</td>` : `<td class="agg-count">${r.target}</td>`}<td class="agg-count">${r.issue}</td></tr>`).join('')}
         </tbody>
         <tfoot>
-          <tr><td colspan="${headers.length-1}">합계</td><td class="agg-count">${filtered.length}</td></tr>
+          <tr><td colspan="${dimColCount}">합계</td>${hasTarget ? `<td class="agg-count">${totalTarget}</td><td class="agg-count">${totalOutTarget}</td>` : `<td class="agg-count">${totalTarget}</td>`}<td class="agg-count">${totalIssue}</td></tr>
         </tfoot>
       </table>
     </div>
@@ -1293,7 +1321,6 @@ function toggleAgg(dim){
   if(dim === 'worker') aggByWorker = !aggByWorker;
   else if(dim === 'device') aggByDevice = !aggByDevice;
   else if(dim === 'date') aggByDate = !aggByDate;
-  else if(dim === 'target') aggByTargetStatus = !aggByTargetStatus;
   render();
 }
 
@@ -1342,7 +1369,6 @@ function renderStatus(){
       <h3>집계 보기</h3>
       <div class="agg-checks">
         <label><input type="checkbox" ${aggByDate?'checked':''} onchange="toggleAgg('date')"> 일별</label>
-        ${hasTarget ? `<label><input type="checkbox" ${aggByTargetStatus?'checked':''} onchange="toggleAgg('target')"> 대상</label>` : ''}
         <label><input type="checkbox" ${aggByWorker?'checked':''} onchange="toggleAgg('worker')"> 작업자</label>
         <label><input type="checkbox" ${aggByDevice?'checked':''} onchange="toggleAgg('device')"> 장비</label>
       </div>
@@ -1874,7 +1900,6 @@ function confirmNewProject(){
   aggByWorker = false;
   aggByDevice = false;
   aggByDate = false;
-  aggByTargetStatus = false;
   digits = '';
   lastScan = '';
   closeNewProjectModal();
@@ -1909,7 +1934,6 @@ function confirmReset(){
   aggByWorker = false;
   aggByDevice = false;
   aggByDate = false;
-  aggByTargetStatus = false;
   rebuildTargetSet();
   currentTab = 'setup';
   closeResetModal();
@@ -2034,11 +2058,8 @@ function adjustCompactness(){
   const main = document.getElementById('main');
   const content = document.getElementById('mainContent');
   app.classList.remove('compact','ultra-compact','roomy');
-  if(currentTab !== 'capture' && currentTab !== 'issues'){
-    removeDebugBadge();
-    return;
-  }
-  if(!content){ removeDebugBadge(); return; }
+  if(currentTab !== 'capture' && currentTab !== 'issues') return;
+  if(!content) return;
   // 실제로 화면을 넘치는지 측정해서, 넘칠 때만 단계적으로 압축 (기기별로 정확하게 대응)
   if(content.scrollHeight > main.clientHeight + 1){
     app.classList.add('compact');
@@ -2053,27 +2074,6 @@ function adjustCompactness(){
       app.classList.add('roomy');
     }
   }
-  showDebugBadge(content, main);
-}
-
-// TEMPORARY DEBUG BADGE — 문제 진단용, 해결되면 제거 예정
-function showDebugBadge(content, main){
-  let badge = document.getElementById('debugBadge');
-  if(!badge){
-    badge = document.createElement('div');
-    badge.id = 'debugBadge';
-    badge.style.cssText = 'position:fixed;bottom:70px;right:8px;z-index:999;background:rgba(0,0,0,.75);color:#fff;font-size:11px;padding:6px 9px;border-radius:8px;font-family:monospace;line-height:1.5;pointer-events:none;';
-    document.body.appendChild(badge);
-  }
-  const app = document.getElementById('app');
-  const mode = app.classList.contains('ultra-compact') ? 'ultra-compact'
-    : app.classList.contains('compact') ? 'compact'
-    : app.classList.contains('roomy') ? 'roomy' : 'normal';
-  badge.textContent = `sH:${content.scrollHeight} cH:${main.clientHeight} mode:${mode}`;
-}
-function removeDebugBadge(){
-  const badge = document.getElementById('debugBadge');
-  if(badge) badge.remove();
 }
 
 function setViewportHeight(){
