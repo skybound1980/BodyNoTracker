@@ -2031,7 +2031,10 @@ function adjustCompactness(){
   const app = document.getElementById('app');
   const main = document.getElementById('main');
   app.classList.remove('compact','ultra-compact','roomy');
-  if(currentTab !== 'capture' && currentTab !== 'issues') return;
+  if(currentTab !== 'capture' && currentTab !== 'issues'){
+    removeDebugBadge();
+    return;
+  }
   // 실제로 화면을 넘치는지 측정해서, 넘칠 때만 단계적으로 압축 (기기별로 정확하게 대응)
   if(main.scrollHeight > main.clientHeight + 1){
     app.classList.add('compact');
@@ -2046,6 +2049,27 @@ function adjustCompactness(){
       app.classList.add('roomy');
     }
   }
+  showDebugBadge(main);
+}
+
+// TEMPORARY DEBUG BADGE — 문제 진단용, 해결되면 제거 예정
+function showDebugBadge(main){
+  let badge = document.getElementById('debugBadge');
+  if(!badge){
+    badge = document.createElement('div');
+    badge.id = 'debugBadge';
+    badge.style.cssText = 'position:fixed;bottom:70px;right:8px;z-index:999;background:rgba(0,0,0,.75);color:#fff;font-size:11px;padding:6px 9px;border-radius:8px;font-family:monospace;line-height:1.5;pointer-events:none;';
+    document.body.appendChild(badge);
+  }
+  const app = document.getElementById('app');
+  const mode = app.classList.contains('ultra-compact') ? 'ultra-compact'
+    : app.classList.contains('compact') ? 'compact'
+    : app.classList.contains('roomy') ? 'roomy' : 'normal';
+  badge.textContent = `sH:${main.scrollHeight} cH:${main.clientHeight} mode:${mode}`;
+}
+function removeDebugBadge(){
+  const badge = document.getElementById('debugBadge');
+  if(badge) badge.remove();
 }
 
 function setViewportHeight(){
