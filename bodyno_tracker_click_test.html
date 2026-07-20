@@ -411,6 +411,26 @@
     border-radius:14px;
   }
 
+  /* Adaptive compact mode: applied via JS only when content actually overflows the screen */
+  #app.compact .keypad{gap:6px;}
+  #app.compact .key{padding:9px 0;font-size:24px;}
+  #app.compact .key.func{font-size:12px;}
+  #app.compact .capture-stats{margin-bottom:8px;}
+  #app.compact .stat-box{padding:6px 6px;}
+  #app.compact .stat-num{font-size:19px;}
+  #app.compact .stat-lbl{font-size:10px;}
+  #app.compact .capture-head{margin-bottom:8px;}
+  #app.compact .code-pill{padding:6px 12px;font-size:13px;}
+  #app.compact .code-pill-row .inline-label{font-size:12px;}
+  #app.compact .search-row{margin-bottom:6px;}
+  #app.compact .submit-btn{padding:11px;font-size:16px;margin-top:6px;}
+  #app.compact .digit-box{max-width:48px;}
+
+  #app.ultra-compact .keypad{gap:4px;}
+  #app.ultra-compact .key{padding:6px 0;font-size:20px;}
+  #app.ultra-compact .digit-box{max-width:40px;}
+  #app.ultra-compact .capture-stats{display:none;}
+
   /* Status tab */
   .stat-head{
     display:flex;
@@ -663,16 +683,23 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function scanIcon(size){
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;">
-    <path d="M3 8V5.5A2.5 2.5 0 0 1 5.5 3H8"/>
-    <path d="M16 3h2.5A2.5 2.5 0 0 1 21 5.5V8"/>
-    <path d="M21 16v2.5a2.5 2.5 0 0 1-2.5 2.5H16"/>
-    <path d="M8 21H5.5A2.5 2.5 0 0 1 3 18.5V16"/>
-    <line x1="7" y1="9" x2="7" y2="15"/>
-    <line x1="10" y1="9" x2="10" y2="15"/>
-    <line x1="13" y1="9" x2="13" y2="15"/>
-    <line x1="16" y1="9" x2="16" y2="15"/>
-    <line x1="4" y1="12" x2="20" y2="12" stroke="#F5A623" stroke-width="2.5"/>
+  const w = Math.round(size*1.5);
+  return `<svg width="${w}" height="${size}" viewBox="0 0 32 20" style="vertical-align:middle;">
+    <g fill="currentColor">
+      <rect x="2" y="3" width="11" height="6" rx="2.5"/>
+      <rect x="3" y="7" width="4" height="9.5" rx="2" transform="rotate(25 5 7)"/>
+    </g>
+    <line x1="13" y1="6.5" x2="17" y2="6.5" stroke="#F5A623" stroke-width="1.7" stroke-linecap="round"/>
+    <g fill="currentColor">
+      <rect x="18" y="1.5" width="1.1" height="16"/>
+      <rect x="19.9" y="1.5" width="0.7" height="16"/>
+      <rect x="21.2" y="1.5" width="1.4" height="16"/>
+      <rect x="23.3" y="1.5" width="0.7" height="16"/>
+      <rect x="24.5" y="1.5" width="1.1" height="16"/>
+      <rect x="26.3" y="1.5" width="1.6" height="16"/>
+      <rect x="28.7" y="1.5" width="0.8" height="16"/>
+      <rect x="30.2" y="1.5" width="0.9" height="16"/>
+    </g>
   </svg>`;
 }
 
@@ -1990,11 +2017,28 @@ function render(){
       }, 150);
     });
   }
+
+  adjustCompactness();
+}
+
+function adjustCompactness(){
+  const app = document.getElementById('app');
+  const main = document.getElementById('main');
+  app.classList.remove('compact','ultra-compact');
+  if(currentTab !== 'capture' && currentTab !== 'issues') return;
+  // 실제로 화면을 넘치는지 측정해서, 넘칠 때만 단계적으로 압축 (기기별로 정확하게 대응)
+  if(main.scrollHeight > main.clientHeight + 1){
+    app.classList.add('compact');
+  }
+  if(main.scrollHeight > main.clientHeight + 1){
+    app.classList.add('ultra-compact');
+  }
 }
 
 function setViewportHeight(){
   const vh = (window.visualViewport ? window.visualViewport.height : window.innerHeight) * 0.01;
   document.documentElement.style.setProperty('--vh', `${vh}px`);
+  if(typeof adjustCompactness === 'function') adjustCompactness();
 }
 setViewportHeight();
 window.addEventListener('resize', setViewportHeight);
