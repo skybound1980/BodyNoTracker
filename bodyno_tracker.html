@@ -112,6 +112,7 @@
   main{
     flex:1;
     overflow-y:auto;
+    overflow-x:hidden;
     padding:16px 16px 24px;
     -webkit-overflow-scrolling:touch;
   }
@@ -358,13 +359,15 @@
 
   .digit-boxes{
     display:grid;
-    grid-template-columns:repeat(6, 1fr);
+    grid-template-columns:repeat(6, minmax(0, 1fr));
     flex:1;
+    min-width:0;
     gap:6px;
     justify-items:center;
   }
   .digit-box{
     width:100%;
+    min-width:0;
     max-width:56px;
     aspect-ratio:1/1.15;
     background:#fff;
@@ -1074,13 +1077,24 @@ function submitBodyNo(){
 }
 
 /* ---------------- Status Tab ---------------- */
+function unresolvedIssueBodySet(){
+  return new Set(state.issues.filter(i => !i.resolved).map(i => normBody(i.bodyNo)));
+}
+
 function getStatusData(){
   const records = state.allRecordsCache !== null ? state.allRecordsCache : state.myRecords;
   const hasTarget = state.targetList.length > 0;
   const total = state.targetList.length;
   const inTargetRecords = hasTarget ? records.filter(r => isInTarget(r.bodyNo)) : [];
   const outTargetRecords = hasTarget ? records.filter(r => !isInTarget(r.bodyNo)) : [];
-  const completed = hasTarget ? inTargetRecords.length : records.length;
+
+  // 완료 수량(대상등록/비대상 등록/진행율)은 미조치 이상이 걸린 Body No는 제외하고 집계.
+  // 조치완료되면 다시 포함됨. 대상/대상외 분류 자체(태그/리스트/필터)는 영향 없음.
+  const unresolvedSet = unresolvedIssueBodySet();
+  const countableRecords = records.filter(r => !unresolvedSet.has(normBody(r.bodyNo)));
+  const inTargetCountable = hasTarget ? countableRecords.filter(r => isInTarget(r.bodyNo)) : [];
+  const outTargetCountable = hasTarget ? countableRecords.filter(r => !isInTarget(r.bodyNo)) : [];
+  const completed = hasTarget ? inTargetCountable.length : countableRecords.length;
   const pct = hasTarget ? Math.min(100, Math.round(completed/total*100)) : null;
 
   let base = records;
@@ -1105,7 +1119,7 @@ function getStatusData(){
       || String(r.device||'').toUpperCase().replace(/\s+/g,'').includes(q);
   }).slice().sort((a,b)=> new Date(b.ts||b.timestamp) - new Date(a.ts||a.timestamp));
 
-  return { records, hasTarget, total, inTargetRecords, outTargetRecords, completed, pct, filtered, workerOptions, deviceOptions, dateOptions, codeOptions };
+  return { records, hasTarget, total, inTargetRecords, outTargetRecords, inTargetCountable, outTargetCountable, completed, pct, filtered, workerOptions, deviceOptions, dateOptions, codeOptions };
 }
 
 function renderRecRow(r, hasTarget){
@@ -1258,14 +1272,14 @@ function onStatusSearchInput(val){
 }
 
 function renderStatus(){
-  const { hasTarget, total, inTargetRecords, outTargetRecords, completed, pct, filtered } = getStatusData();
+  const { hasTarget, total, inTargetCountable, outTargetCountable, completed, pct, filtered } = getStatusData();
   const syncLabel = state.lastSync ? `마지막 동기화: ${fmtTime(state.lastSync)}` : (state.gasUrl ? '아직 동기화되지 않음' : '연동 URL 미설정 — 이 기기의 기록만 표시됩니다');
   const unresolvedIssues = state.issues.filter(i => !i.resolved).length;
 
   const miniStats = hasTarget ? `
     <div class="mini-stats-row">
-      <div class="mini-stat mini-in"><div class="mini-stat-num">${inTargetRecords.length}</div><div class="mini-stat-lbl">대상등록</div></div>
-      <div class="mini-stat mini-out"><div class="mini-stat-num">${outTargetRecords.length}</div><div class="mini-stat-lbl">비대상 등록</div></div>
+      <div class="mini-stat mini-in"><div class="mini-stat-num">${inTargetCountable.length}</div><div class="mini-stat-lbl">대상등록</div></div>
+      <div class="mini-stat mini-out"><div class="mini-stat-num">${outTargetCountable.length}</div><div class="mini-stat-lbl">비대상 등록</div></div>
       <div class="mini-stat mini-issue"><div class="mini-stat-num">${state.issues.length}</div><div class="mini-stat-lbl">이상${unresolvedIssues ? ` (미조치 ${unresolvedIssues})` : ''}</div></div>
     </div>
   ` : `
@@ -1331,7 +1345,8 @@ function getPendingData(){
   const hasTarget = state.targetList.length > 0;
   if(!hasTarget) return { hasTarget, total: 0, pending: [], registeredCount: 0, filtered: [], sOffOptions: [], statusOptions: [], plantOptions: [], locationOptions: [], soldOptions: [] };
   const records = state.allRecordsCache !== null ? state.allRecordsCache : state.myRecords;
-  const registeredSet = new Set(records.map(r => normBody(r.bodyNo)));
+  const unresolvedSet = unresolvedIssueBodySet();
+  const registeredSet = new Set(records.filter(r => !unresolvedSet.has(normBody(r.bodyNo))).map(r => normBody(r.bodyNo)));
   const pending = state.targetList.filter(t => !registeredSet.has(normBody(targetBodyNo(t))));
 
   const sOffOptions = [...new Set(pending.map(t=>dateOnly(pendingMeta(t).sOff)).filter(Boolean))]
