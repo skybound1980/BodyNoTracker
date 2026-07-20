@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bodyno-tracker-v1';
+const CACHE_NAME = 'bodyno-tracker-v2'; // 버전 올림: 예전 캐시 자동 정리 트리거
 const CORE_ASSETS = [
   './bodyno_tracker.html',
   './manifest.json',
@@ -22,20 +22,22 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Cache-first for the app shell; always go to network for Google Apps Script requests
+// Network-first: 온라인이면 항상 최신 파일을 먼저 가져오고, 실패(오프라인) 시에만 캐시 사용.
+// 구글 앱스스크립트(실데이터) 요청은 캐싱 대상에서 완전히 제외.
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
-  if (url.includes('script.google.com')) return; // never cache live data calls
+  if (url.includes('script.google.com')) return;
+  if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((res) => {
-        if (event.request.method === 'GET' && res.ok && url.startsWith(self.location.origin)) {
+    fetch(event.request)
+      .then((res) => {
+        if (res.ok && url.startsWith(self.location.origin)) {
           const resClone = res.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
         }
         return res;
-      }).catch(() => cached);
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });
