@@ -31,7 +31,7 @@
     --radius:14px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html,body{height:100%;}
+  html,body{height:100%;overscroll-behavior-y:contain;}
   body{
     margin:0;
     background:var(--bg);
@@ -113,6 +113,7 @@
     flex:1;
     overflow-y:auto;
     overflow-x:hidden;
+    overscroll-behavior-y:contain;
     padding:16px 16px 24px;
     -webkit-overflow-scrolling:touch;
   }
@@ -625,7 +626,7 @@ function loadState(){
 function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
 let state = loadState();
-let currentTab = state.worker ? 'capture' : 'setup';
+let currentTab = localStorage.getItem('bodyno_last_tab') || (state.worker ? 'capture' : 'setup');
 let selectedCode = state.carCodes.length ? state.carCodes[0] : null;
 let selectedDevice = state.devices.length ? state.devices[0] : null;
 let digits = '';
@@ -1908,6 +1909,7 @@ function confirmNewProject(){
 }
 function confirmReset(){
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem('bodyno_last_tab');
   state = defaultState();
   selectedCode = null;
   selectedDevice = null;
@@ -1945,6 +1947,7 @@ function confirmReset(){
 function goTab(t){
   if(currentTab === 'capture' && t !== 'capture'){ searchMode = false; searchResult = null; }
   currentTab = t;
+  localStorage.setItem('bodyno_last_tab', t);
   if(t === 'capture' && !selectedCode && state.carCodes.length) selectedCode = state.carCodes[0];
   if(t === 'capture' && !selectedDevice && state.devices.length) selectedDevice = state.devices[0];
   if(t === 'status' || t === 'pending' || t === 'issues') syncStatus();
@@ -2091,6 +2094,10 @@ if(window.visualViewport){
 rebuildTargetSet();
 render();
 if(state.gasUrl) syncStatus();
+
+if(document.fonts && document.fonts.ready){
+  document.fonts.ready.then(()=>{ adjustCompactness(); });
+}
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
