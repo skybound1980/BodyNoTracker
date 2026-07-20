@@ -431,6 +431,16 @@
   #app.ultra-compact .digit-box{max-width:40px;}
   #app.ultra-compact .capture-stats{display:none;}
 
+  /* Roomy mode: extra vertical space available (e.g. installed PWA without browser address bar) — grow slightly to fill it instead of leaving dead space */
+  #app.roomy .keypad{gap:12px;}
+  #app.roomy .key{padding:20px 0;font-size:36px;}
+  #app.roomy .key.func{font-size:16px;}
+  #app.roomy .digit-box{max-width:64px;}
+  #app.roomy .submit-btn{padding:19px;font-size:20px;}
+  #app.roomy .capture-stats{margin-bottom:16px;}
+  #app.roomy .stat-box{padding:14px 8px;}
+  #app.roomy .stat-num{font-size:28px;}
+
   /* Status tab */
   .stat-head{
     display:flex;
@@ -2024,7 +2034,7 @@ function render(){
 function adjustCompactness(){
   const app = document.getElementById('app');
   const main = document.getElementById('main');
-  app.classList.remove('compact','ultra-compact');
+  app.classList.remove('compact','ultra-compact','roomy');
   if(currentTab !== 'capture' && currentTab !== 'issues') return;
   // 실제로 화면을 넘치는지 측정해서, 넘칠 때만 단계적으로 압축 (기기별로 정확하게 대응)
   if(main.scrollHeight > main.clientHeight + 1){
@@ -2032,6 +2042,13 @@ function adjustCompactness(){
   }
   if(main.scrollHeight > main.clientHeight + 1){
     app.classList.add('ultra-compact');
+  }
+  // 반대로 여유 공간이 많이 남으면(예: 홈화면 설치로 브라우저 UI가 없어 공간이 넉넉한 경우) 살짝 키워서 채움
+  if(!app.classList.contains('compact')){
+    const slack = main.clientHeight - main.scrollHeight;
+    if(slack > 70){
+      app.classList.add('roomy');
+    }
   }
 }
 
