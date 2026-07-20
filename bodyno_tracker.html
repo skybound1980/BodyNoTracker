@@ -1965,11 +1965,13 @@ function render(){
     b.classList.toggle('active', b.dataset.tab === currentTab);
   });
   const main = document.getElementById('main');
-  if(currentTab === 'setup') main.innerHTML = renderSetup();
-  else if(currentTab === 'capture') main.innerHTML = renderCapture();
-  else if(currentTab === 'status') main.innerHTML = renderStatus();
-  else if(currentTab === 'pending') main.innerHTML = renderPending();
-  else main.innerHTML = renderIssues();
+  let tabHtml;
+  if(currentTab === 'setup') tabHtml = renderSetup();
+  else if(currentTab === 'capture') tabHtml = renderCapture();
+  else if(currentTab === 'status') tabHtml = renderStatus();
+  else if(currentTab === 'pending') tabHtml = renderPending();
+  else tabHtml = renderIssues();
+  main.innerHTML = `<div id="mainContent">${tabHtml}</div>`;
 
   const issueDetailInp = document.getElementById('issueDetailInput');
   if(issueDetailInp) issueDetailInp.addEventListener('input', ()=>{ issueDetailText = issueDetailInp.value; });
@@ -2030,30 +2032,32 @@ function render(){
 function adjustCompactness(){
   const app = document.getElementById('app');
   const main = document.getElementById('main');
+  const content = document.getElementById('mainContent');
   app.classList.remove('compact','ultra-compact','roomy');
   if(currentTab !== 'capture' && currentTab !== 'issues'){
     removeDebugBadge();
     return;
   }
+  if(!content){ removeDebugBadge(); return; }
   // 실제로 화면을 넘치는지 측정해서, 넘칠 때만 단계적으로 압축 (기기별로 정확하게 대응)
-  if(main.scrollHeight > main.clientHeight + 1){
+  if(content.scrollHeight > main.clientHeight + 1){
     app.classList.add('compact');
   }
-  if(main.scrollHeight > main.clientHeight + 1){
+  if(content.scrollHeight > main.clientHeight + 1){
     app.classList.add('ultra-compact');
   }
   // 반대로 여유 공간이 많이 남으면(예: 홈화면 설치로 브라우저 UI가 없어 공간이 넉넉한 경우) 살짝 키워서 채움
   if(!app.classList.contains('compact')){
-    const slack = main.clientHeight - main.scrollHeight;
+    const slack = main.clientHeight - content.scrollHeight;
     if(slack > 70){
       app.classList.add('roomy');
     }
   }
-  showDebugBadge(main);
+  showDebugBadge(content, main);
 }
 
 // TEMPORARY DEBUG BADGE — 문제 진단용, 해결되면 제거 예정
-function showDebugBadge(main){
+function showDebugBadge(content, main){
   let badge = document.getElementById('debugBadge');
   if(!badge){
     badge = document.createElement('div');
@@ -2065,7 +2069,7 @@ function showDebugBadge(main){
   const mode = app.classList.contains('ultra-compact') ? 'ultra-compact'
     : app.classList.contains('compact') ? 'compact'
     : app.classList.contains('roomy') ? 'roomy' : 'normal';
-  badge.textContent = `sH:${main.scrollHeight} cH:${main.clientHeight} mode:${mode}`;
+  badge.textContent = `sH:${content.scrollHeight} cH:${main.clientHeight} mode:${mode}`;
 }
 function removeDebugBadge(){
   const badge = document.getElementById('debugBadge');
