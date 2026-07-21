@@ -692,6 +692,13 @@ function fmtTime(ts){
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+const CODE_COLOR_PALETTE = ['#1F2A3C','#2563EB','#059669','#DC2626','#7C3AED','#EA580C','#0D9488','#DB2777','#4338CA','#65A30D','#0891B2','#B45309'];
+function colorForCode(code){
+  if(!code) return CODE_COLOR_PALETTE[0];
+  let hash = 0;
+  for(let i=0;i<code.length;i++){ hash = (hash*31 + code.charCodeAt(i)) >>> 0; }
+  return CODE_COLOR_PALETTE[hash % CODE_COLOR_PALETTE.length];
+}
 function scanIcon(size){
   const w = Math.round(size*1.5);
   return `<svg width="${w}" height="${size}" viewBox="0 0 32 20" style="vertical-align:middle;">
@@ -899,7 +906,7 @@ function renderCaptureManual(){
     ${pillRow}
     ${deviceRow}
     <div class="capture-head">
-      <div class="code-tag">${escapeHtml(selectedCode)}</div>
+      <div class="code-tag" style="background:${colorForCode(selectedCode)};">${escapeHtml(selectedCode)}</div>
       <div class="digit-boxes">${boxes.join('')}</div>
     </div>
     <div class="keypad">
@@ -931,7 +938,7 @@ function renderCaptureScan(){
     <div class="card" id="scanCard" style="text-align:center;padding:34px 16px 26px;" onclick="focusScanInput()">
       <div style="font-size:48px;line-height:1;">${submitting ? '⏳' : scanIcon(48)}</div>
       <h3 style="justify-content:center;margin-top:12px;">${submitting ? '저장 중...' : '바코드 스캔 대기 중'}</h3>
-      <div class="help">${searchMode ? '스캔 시 대상이면 자동 등록되고, 비대상이면 등록 버튼을 눌러야 저장됩니다.' : '블루투스로 연결된 스캐너에서 Body No 바코드를 스캔하면 자동으로 저장됩니다.'}</div>
+      <div class="help">${searchMode ? '스캔 시 대상이면 자동 등록되고, 대상 외이면 등록 버튼을 눌러야 저장됩니다.' : '블루투스로 연결된 스캐너에서 Body No 바코드를 스캔하면 자동으로 저장됩니다.'}</div>
       <input id="scanInput" type="text" inputmode="none" autocomplete="off" autocapitalize="off" spellcheck="false"
         style="position:absolute;width:1px;height:1px;opacity:0;border:none;padding:0;">
       <div style="margin-top:20px;font-family:'Roboto Mono',monospace;font-weight:700;font-size:24px;letter-spacing:2px;color:var(--primary);">
@@ -992,7 +999,7 @@ function handleScanValue(raw){
     if(match){
       submitBodyNo(); // 대상 → 자동 등록
     } else {
-      render(); // 비대상 → 자동 등록하지 않고, 등록 버튼을 눌러야 함
+      render(); // 대상 외 → 자동 등록하지 않고, 등록 버튼을 눌러야 함
     }
   } else {
     submitBodyNo(); // 대상 검색 비활성 → 항상 자동 등록
@@ -1065,7 +1072,7 @@ function renderSearchRow(){
   } else if(!searchResult.hasTarget){
     badge = `<div class="search-badge empty">대상 리스트 미설정</div>`;
   } else {
-    badge = `<div class="search-badge ${searchResult.matched ? 'found' : 'notfound'}">${escapeHtml(searchResult.bodyNo)} ${searchResult.matched ? '대상' : '비대상'}</div>`;
+    badge = `<div class="search-badge ${searchResult.matched ? 'found' : 'notfound'}">${escapeHtml(searchResult.bodyNo)} ${searchResult.matched ? '대상' : '대상 외'}</div>`;
   }
   return `
     <div class="search-row">
@@ -1106,7 +1113,7 @@ function submitBodyNo(){
         saveState();
         const inTarget = isInTarget(bodyNo);
         if(inTarget === false){
-          toast('info', `⚠ 대상외 등록: ${bodyNo} (대상 리스트에 없음)`, 3200);
+          toast('info', `⚠ 대상 외 등록: ${bodyNo} (대상 리스트에 없음)`, 3200);
         } else {
           toast('success', `저장 완료: ${bodyNo}`);
         }
@@ -1139,8 +1146,8 @@ function getStatusData(){
   const inTargetRecords = hasTarget ? records.filter(r => isInTarget(r.bodyNo)) : [];
   const outTargetRecords = hasTarget ? records.filter(r => !isInTarget(r.bodyNo)) : [];
 
-  // 완료 수량(대상등록/비대상 등록/진행율)은 미조치 이상이 걸린 Body No는 제외하고 집계.
-  // 조치완료되면 다시 포함됨. 대상/대상외 분류 자체(태그/리스트/필터)는 영향 없음.
+  // 완료 수량(대상등록/대상 외 등록/진행율)은 미조치 이상이 걸린 Body No는 제외하고 집계.
+  // 조치완료되면 다시 포함됨. 대상/대상 외 분류 자체(태그/리스트/필터)는 영향 없음.
   const unresolvedSet = unresolvedIssueBodySet();
   const countableRecords = records.filter(r => !unresolvedSet.has(normBody(r.bodyNo)));
   const inTargetCountable = hasTarget ? countableRecords.filter(r => isInTarget(r.bodyNo)) : [];
@@ -1175,7 +1182,7 @@ function getStatusData(){
 
 function renderRecRow(r, hasTarget){
   const inT = hasTarget ? isInTarget(r.bodyNo) : null;
-  const tag = hasTarget ? `<span class="tag ${inT ? 'tag-in' : 'tag-out'}">${inT ? '대상' : '대상외'}</span>` : '';
+  const tag = hasTarget ? `<span class="tag ${inT ? 'tag-in' : 'tag-out'}">${inT ? '대상' : '대상 외'}</span>` : '';
   return `
     <tr>
       <td>${tag}</td>
@@ -1198,7 +1205,7 @@ function renderStatusList(filtered, hasTarget){
       <select class="th-filter" onchange="setStatusFilter(this.value)">
         <option value="all" ${statusFilter==='all'?'selected':''}>대상: 전체</option>
         <option value="in" ${statusFilter==='in'?'selected':''}>대상만</option>
-        <option value="out" ${statusFilter==='out'?'selected':''}>대상외만</option>
+        <option value="out" ${statusFilter==='out'?'selected':''}>대상 외만</option>
       </select>
     </th>
   ` : `<th>대상</th>`;
@@ -1280,7 +1287,7 @@ function renderAggBody(){
       g.target++;
     }
   });
-  state.issues.forEach(i=>{
+  state.issues.filter(i=>!i.resolved).forEach(i=>{
     const dateStr = new Date(i.timestamp).toLocaleDateString('ko-KR');
     const g = getGroup(keyPartsFor(dateStr, i.worker, aggByDevice ? '' : undefined));
     g.issue++;
@@ -1292,7 +1299,7 @@ function renderAggBody(){
   if(aggByDate) headers.push('날짜');
   if(aggByWorker) headers.push('작업자');
   if(aggByDevice) headers.push('장비');
-  if(hasTarget){ headers.push('대상'); headers.push('비대상'); } else { headers.push('등록'); }
+  if(hasTarget){ headers.push('대상'); headers.push('대상 외'); } else { headers.push('등록'); }
   headers.push('이상');
 
   if(!rows.length){
@@ -1344,13 +1351,13 @@ function renderStatus(){
   const miniStats = hasTarget ? `
     <div class="mini-stats-row">
       <div class="mini-stat mini-in"><div class="mini-stat-num">${inTargetCountable.length}</div><div class="mini-stat-lbl">대상등록</div></div>
-      <div class="mini-stat mini-out"><div class="mini-stat-num">${outTargetCountable.length}</div><div class="mini-stat-lbl">비대상 등록</div></div>
-      <div class="mini-stat mini-issue"><div class="mini-stat-num">${state.issues.length}</div><div class="mini-stat-lbl">이상${unresolvedIssues ? ` (미조치 ${unresolvedIssues})` : ''}</div></div>
+      <div class="mini-stat mini-out"><div class="mini-stat-num">${outTargetCountable.length}</div><div class="mini-stat-lbl">대상 외 등록</div></div>
+      <div class="mini-stat mini-issue"><div class="mini-stat-num">${unresolvedIssues}</div><div class="mini-stat-lbl">이상</div></div>
     </div>
   ` : `
     <div class="mini-stats-row">
       <div class="mini-stat mini-in"><div class="mini-stat-num">${completed}</div><div class="mini-stat-lbl">전체 등록</div></div>
-      <div class="mini-stat mini-issue"><div class="mini-stat-num">${state.issues.length}</div><div class="mini-stat-lbl">이상${unresolvedIssues ? ` (미조치 ${unresolvedIssues})` : ''}</div></div>
+      <div class="mini-stat mini-issue"><div class="mini-stat-num">${unresolvedIssues}</div><div class="mini-stat-lbl">이상</div></div>
     </div>
   `;
 
@@ -1557,7 +1564,10 @@ function renderIssueForm(){
   return `
     ${entrySection}
     <div class="card">
-      <h3>이상 등록</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <span style="font-weight:700;font-size:15px;color:var(--ink);">이상등록</span>
+        <button class="btn btn-primary" data-action="issue-submit" style="padding:9px 22px;font-size:14px;border-radius:10px;width:auto;" ${canSubmit ? '' : 'disabled'}>${issueSubmitting ? '등록 중...' : '등록'}</button>
+      </div>
       <div class="field">
         <label class="lbl">이상항목</label>
         <div class="mode-row">
@@ -1565,10 +1575,8 @@ function renderIssueForm(){
         </div>
       </div>
       <div class="field">
-        <label class="lbl">상세내용 (선택)</label>
-        <textarea id="issueDetailInput" class="ta" rows="3" placeholder="이상 내용을 자세히 입력하세요">${escapeHtml(issueDetailText)}</textarea>
+        <textarea id="issueDetailInput" class="ta" rows="3" placeholder="문제점, 차량위치 등 상세 내용 기입">${escapeHtml(issueDetailText)}</textarea>
       </div>
-      <button class="btn btn-primary btn-block" data-action="issue-submit" ${canSubmit ? '' : 'disabled'}>${issueSubmitting ? '등록 중...' : '이상 등록'}</button>
     </div>
   `;
 }
@@ -1590,7 +1598,7 @@ function renderIssueKeypadEntry(){
       </div>
     </div>
     <div class="capture-head">
-      <div class="code-tag">${escapeHtml(issueSelectedCode)}</div>
+      <div class="code-tag" style="background:${colorForCode(issueSelectedCode)};">${escapeHtml(issueSelectedCode)}</div>
       <div class="digit-boxes">${boxes.join('')}</div>
     </div>
     <div class="keypad" style="margin-bottom:16px;">
@@ -2029,7 +2037,9 @@ function render(){
     });
     scanInput.addEventListener('blur', ()=>{
       setTimeout(()=>{
-        if(currentTab === 'capture' && state.inputMode === 'scan') scanInput.focus();
+        const active = document.activeElement;
+        const isTypingElsewhere = active && active !== scanInput && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT');
+        if(currentTab === 'capture' && state.inputMode === 'scan' && !isTypingElsewhere) scanInput.focus();
       }, 150);
     });
   }
@@ -2048,7 +2058,9 @@ function render(){
     });
     issueScanInput.addEventListener('blur', ()=>{
       setTimeout(()=>{
-        if(currentTab === 'issues' && state.inputMode === 'scan') issueScanInput.focus();
+        const active = document.activeElement;
+        const isTypingElsewhere = active && active !== issueScanInput && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT');
+        if(currentTab === 'issues' && state.inputMode === 'scan' && !isTypingElsewhere) issueScanInput.focus();
       }, 150);
     });
   }
