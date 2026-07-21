@@ -432,15 +432,17 @@
   #app.ultra-compact .digit-box{max-width:40px;}
   #app.ultra-compact .capture-stats{display:none;}
 
-  /* Roomy mode: extra vertical space available (e.g. installed PWA without browser address bar) — grow slightly to fill it instead of leaving dead space */
-  #app.roomy .keypad{gap:12px;}
-  #app.roomy .key{padding:20px 0;font-size:36px;}
-  #app.roomy .key.func{font-size:16px;}
-  #app.roomy .digit-box{max-width:64px;}
-  #app.roomy .submit-btn{padding:19px;font-size:20px;}
-  #app.roomy .capture-stats{margin-bottom:16px;}
-  #app.roomy .stat-box{padding:14px 8px;}
-  #app.roomy .stat-num{font-size:28px;}
+  /* Roomy mode: extra vertical space available (e.g. installed PWA without browser address bar).
+     Growth amount is set by JS via CSS variables, proportional to the actual leftover space,
+     instead of one fixed jump — so it scales correctly whether the gap is small or large. */
+  #app.roomy .keypad{gap:calc(8px + var(--roomy-gap,0px));}
+  #app.roomy .key{padding:calc(14px + var(--roomy-key-pad,0px)) 0;font-size:calc(32px + var(--roomy-key-font,0px));}
+  #app.roomy .key.func{font-size:calc(15px + var(--roomy-key-font,0px) * 0.4);}
+  #app.roomy .digit-box{max-width:calc(56px + var(--roomy-box-extra,0px));}
+  #app.roomy .submit-btn{padding:calc(15px + var(--roomy-btn-pad,0px));font-size:calc(19px + var(--roomy-btn-font,0px));}
+  #app.roomy .capture-stats{margin-bottom:calc(14px + var(--roomy-key-pad,0px) * 0.5);}
+  #app.roomy .stat-box{padding:calc(10px + var(--roomy-key-pad,0px) * 0.4) 8px;}
+  #app.roomy .stat-num{font-size:calc(24px + var(--roomy-key-font,0px));}
 
   /* Status tab */
   .stat-head{
@@ -1569,7 +1571,6 @@ function renderIssueForm(){
         <button class="btn btn-primary" data-action="issue-submit" style="padding:9px 22px;font-size:14px;border-radius:10px;width:auto;" ${canSubmit ? '' : 'disabled'}>${issueSubmitting ? '등록 중...' : '등록'}</button>
       </div>
       <div class="field">
-        <label class="lbl">이상항목</label>
         <div class="mode-row">
           ${types.map(t=>`<button class="mode-btn${issueType===t?' selected':''}" data-action="issue-type" data-type="${t}">${t}</button>`).join('')}
         </div>
@@ -2072,6 +2073,7 @@ function adjustCompactness(){
   const app = document.getElementById('app');
   const main = document.getElementById('main');
   const content = document.getElementById('mainContent');
+  const root = document.documentElement;
   app.classList.remove('compact','ultra-compact','roomy');
   if(currentTab !== 'capture' && currentTab !== 'issues') return;
   if(!content) return;
@@ -2082,11 +2084,21 @@ function adjustCompactness(){
   if(content.scrollHeight > main.clientHeight + 1){
     app.classList.add('ultra-compact');
   }
-  // 반대로 여유 공간이 많이 남으면(예: 홈화면 설치로 브라우저 UI가 없어 공간이 넉넉한 경우) 살짝 키워서 채움
+  // 반대로 여유 공간이 많이 남으면(예: 홈화면 설치로 브라우저 UI가 없어 공간이 넉넉한 경우)
+  // 여백 크기에 정확히 비례해서 채움 (고정된 한 단계가 아니라 연속적으로 커짐)
   if(!app.classList.contains('compact')){
     const slack = main.clientHeight - content.scrollHeight;
-    if(slack > 70){
+    if(slack > 40){
       app.classList.add('roomy');
+      const level = Math.min(1, (slack - 40) / 320); // 40~360px 여백 구간에서 0~1로 커짐 (그 이상은 상한 적용)
+      root.style.setProperty('--roomy-gap', Math.round(level*10)+'px');
+      root.style.setProperty('--roomy-key-pad', Math.round(level*18)+'px');
+      root.style.setProperty('--roomy-key-font', Math.round(level*12)+'px');
+      root.style.setProperty('--roomy-box-extra', Math.round(level*16)+'px');
+      root.style.setProperty('--roomy-btn-pad', Math.round(level*10)+'px');
+      root.style.setProperty('--roomy-btn-font', Math.round(level*5)+'px');
+    } else {
+      ['--roomy-gap','--roomy-key-pad','--roomy-key-font','--roomy-box-extra','--roomy-btn-pad','--roomy-btn-font'].forEach(v=>root.style.setProperty(v,'0px'));
     }
   }
 }
